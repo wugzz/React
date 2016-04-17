@@ -20,6 +20,16 @@ var Button = React.createClass({
     },
 });
 
+/**
+ * 图片组件
+ */
+var Img = React.createClass({
+    render:function(){
+        console.log("this.props ", this.props);
+        return <img src={this.props.src}/>
+    },
+});
+
 /***
  * 网格布局
  */
@@ -35,6 +45,8 @@ var Grid = React.createClass({
         border:PropTypes.bool,
         //titles
         titles:IPropTypes.list,
+        //比例
+        ratio:IPropTypes.list,
     },
 
     render:function(){
@@ -49,18 +61,18 @@ var Grid = React.createClass({
      * @returns {*}
      */
     renderChildren:function(){
-        var {data, renderChild, division}=this.props;
+        var {data, division}=this.props;
         if(data){
             //如果定义了数组分割
             if(division>0){
                 var child=[];
                 for(var i=0; i<data.size; i+=division){
-                    child.push(this.renderLine(data.slice(i,i+division),i, renderChild));
+                    child.push(this.renderLine(data.slice(i,i+division),i));
                 }
                 return child;
             }else{
                 return data.map(function(ldata, li){
-                    return this.renderLine(ldata, li, renderChild)
+                    return this.renderLine(ldata, li)
                 }.bind(this))
             }
         }else{
@@ -76,9 +88,10 @@ var Grid = React.createClass({
      * @param renderChild
      * @returns {XML}
      */
-    renderLine:function(data, i, renderChild){
+    renderLine:function(data, i){
         if(!data||data.size == 0) return null;
-        return <Group key={i} data={data} renderChild={function(idata,ii){
+        var {ratio, renderChild} = this.props;
+        return <Group key={i} data={data} ratio={ratio} renderChild={function(idata,ii){
             return renderChild?renderChild(idata,ii,data,i):idata;
         }}/>
     },
@@ -94,10 +107,40 @@ var Group = React.createClass({
         data:IPropTypes.list,
         //生成item项回调函数
         renderChild:PropTypes.func,
+        //比例
+        ratio:IPropTypes.list,
+    },
+
+    componentWillMount:function(){
+        //计算比例
+        this.ratios = [];
+        var ratio = this.props.ratio, last = 100;
+        if(!ratio) return;
+        if(ratio.size == 1) this.ratios = [];
+        for(var i=1; i<ratio.size; i++){
+            if(i==ratio.size-1){
+                this.ratios.push(last);
+                continue;
+            }
+            var item = (ratio.get(i)*100/ratio.get(0)).toFixed(2);
+            last -= item;
+            this.ratios.push(item);
+        }
     },
 
     render:function(){
         return <div className="Group">{this.renderChildren()}</div>
+    },
+
+    /**
+     * 自动分割
+     * @param child
+     * @param i
+     * @returns {*}
+     */
+    renderRatio:function(child, i){
+        var ratio = this.ratios[i];
+        return ratio?React.cloneElement(child, {style:{width:ratio+"%"}}):child;
     },
 
     /**
@@ -111,8 +154,8 @@ var Group = React.createClass({
         var items = children.map(function(child, i){
             //如果定义了回调方法
             child = renderChild?renderChild(child, i):child;
-            return child;
-        });
+            return this.renderRatio(child,i);
+        }.bind(this));
 
         return items.asImmutable?items.toJS():items;
     },

@@ -32,24 +32,19 @@
 .GNBorder>.Group:first-child>*{
     border-top:none;
 }
+/**去掉最后一行的底部border**/
 .GNBorder>.Group:last-child>*{
     border-bottom:none;
 }
+/**去掉第一列的左边border**/
 .GNBorder>.Group>*:first-child{
     border-left:none;
 }
+/**去掉最后一列的左边border**/
 .GNBorder>.Group>*:last-child{
     border-right:none;
 }
 
-
-.GBorder>*:first-child{
-    border-left: none;
-}
-
-.GBorder>*:last-child{
-    border-right: none;
-}
 
 /**
  *按钮样式
@@ -88,7 +83,7 @@
     text-align: center;
     z-index: 1000;
 }
-
+/*增加此伪类,可以让.dialog居中显示*/
 .Model:before {
     content: "\200B";
     height: 100%;
@@ -102,12 +97,4 @@
     max-width: 98%;
     display: inline-block;
     vertical-align: middle;
-}
-
-.Model>.mask{
-    position: absolute;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    left: 0;
 }

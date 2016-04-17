@@ -39,6 +39,7 @@ var Grid = React.createClass({
 
     render:function(){
         return <div className={"Grid"+(this.props.border==false?" GNBorder":"")}>
+            {this.renderLine(this.props.titles,0,this.props.renderChild)}
             {this.renderChildren()}
         </div>
     },
@@ -76,8 +77,9 @@ var Grid = React.createClass({
      * @returns {XML}
      */
     renderLine:function(data, i, renderChild){
+        if(!data||data.size == 0) return null;
         return <Group key={i} data={data} renderChild={function(idata,ii){
-              return renderChild?renderChild(idata,ii,data,i):idata;
+            return renderChild?renderChild(idata,ii,data,i):idata;
         }}/>
     },
 });

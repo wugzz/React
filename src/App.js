@@ -24,7 +24,7 @@ var Home = React.createClass({
         var data = this.props.store.get("Home").get("data");
 
         return <div className="Home">
-            <Grid data={data} border={false} renderChild={function(child, i){
+            <Grid data={data} border={false} titles={fromJS([1,2,3,4])} renderChild={function(child, i){
                 console.log("-------");
                 return <Button key={i}>{child}</Button>
             }}>

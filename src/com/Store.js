@@ -125,6 +125,10 @@ var Store = {
             // Test for A's keys different from B.
             const bHasOwnProperty = Object.prototype.hasOwnProperty.bind(objB);
             for (let i = 0; i < keysA.length; i++) {
+                //不对同是方法的两个属性进行比较,直接作为没有改变
+                if(typeof objA[keysA[i]] =='function' && typeof objB[keysB[i]] == "function")
+                    continue;
+
                 if (!bHasOwnProperty(keysA[i]) || !is(objA[keysA[i]], objB[keysA[i]])) {
                     return false;
                 }

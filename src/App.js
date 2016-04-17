@@ -4,7 +4,7 @@
 
 
 Store.createStore("Home", {
-    data:["打开弹框","打开弹框","打开弹框","打开弹框","打开弹框"],
+    data:["打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框","打开弹框"],
 });
 
 
@@ -18,14 +18,16 @@ var Home = React.createClass({
         var data = this.props.store.get("Home").get("data");
 
         return <div className="Home">
-            <Grid data={data} border={false} division={3} ratio={fromJS([3,1,1,1,1])} titles={fromJS([1,2,3])} renderChild={function(child, i){
-                return <Button key={i}>{child}</Button>
-            }}>
-            </Grid>
-            <Button onClick={this.onShow}>打开弹框</Button>
-            <Model ref="model">
-                <Img src="img/ss.jpeg"/>
-            </Model>
+            <Scroll>
+                <Grid data={data} border={false} division={1} ratio={fromJS([1,1])} titles={fromJS([1])} renderChild={function(child, i){
+                    return <Button key={i}>{child}</Button>
+                }}>
+                </Grid>
+                <Button onClick={this.onShow}>打开弹框</Button>
+                <Model ref="model">
+                    <Img src="img/ss.jpeg"/>
+                </Model>
+            </Scroll>
         </div>
     },
 

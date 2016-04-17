@@ -131,11 +131,11 @@ gulp.task('WatchSrc',function(){
         //打印改变的文件,以及类型
         console.log("文件: "+ path + " is " + event.type);
         //判断文件的类型,分别执行不同的编译任务
-        if(path.indexOf('.js'))
+        if(path.indexOf('.js')>0)
             gulp.start('TaskJS');
-        else if(path.indexOf('.css'))
+        else if(path.indexOf('.css')>0)
             gulp.start('TaskCSS');
-        else if(path.indexOf('.html'))
+        else if(path.indexOf('.html')>0)
             gulp.start('TaskHtml');
         else
             gulp.start('TaskImage');

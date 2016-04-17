@@ -37,9 +37,12 @@ var Store = {
         if(value == undefined){
             return this._storeTree.getIn(key);
         }
-
-        if(typeof value == "function")
+        //判读value是否为方法
+        if(typeof value == "function"){
             value = value(this._storeTree.getIn(key));
+            //如果没有返回值,则直接退出
+            if(value == undefined) return;
+        }
         else if(!value.asImmutable) value = fromJS(value);
         //修改数据
         this._storeTree = this._storeTree.setIn(key, value);
@@ -63,7 +66,11 @@ var Store = {
      * @param mixin
      */
     createStore: function (name, istore, mixin) {
+        //存储数据
         this.store([name], fromJS(istore), false);
+        //继承方法
+        if(!mixin) mixin = {};
+
         return mixin;
     },
 

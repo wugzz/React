@@ -1,4 +1,81 @@
 /**
+ * Group组件
+ */
+/*选取Group下非第一个元素*/
+.Group>*:not(:last-child){
+    border-right: none;
+    border-bottom-right-radius: 0;
+    border-top-right-radius: 0;
+}
+/*选取Group下非最后一个元素*/
+.Group>*:not(:first-child){
+    border-bottom-left-radius: 0;
+    border-top-left-radius: 0;
+}
+
+/**
+ *Grid组件
+ */
+/*选取Grid的非最一行Group下所有子元素*/
+.Grid>.Group:not(:last-child)>*{
+    border-bottom: none;
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+}
+/*选取Grid的非第一行一行Group下所有子元素*/
+.Grid>.Group:not(:first-child)>*{
+    border-top-right-radius: 0;
+    border-top-left-radius: 0;
+}
+
+/**去掉第一行的顶部border**/
+.GNBorder>.Group:first-child>*{
+    border-top:none;
+}
+.GNBorder>.Group:last-child>*{
+    border-bottom:none;
+}
+.GNBorder>.Group>*:first-child{
+    border-left:none;
+}
+.GNBorder>.Group>*:last-child{
+    border-right:none;
+}
+
+
+.GBorder>*:first-child{
+    border-left: none;
+}
+
+.GBorder>*:last-child{
+    border-right: none;
+}
+
+/**
+ *按钮样式
+ */
+.Button{
+    border: 1px solid #f4f4f4;
+    background: #3bb4f2;
+    padding: .5em 1em;
+    color: #FFF;
+    /*在背景颜色,边框颜色时,使用动画*/
+    -webkit-transition: background-color .3s ease-out,border-color .3s ease-out,color .3s ease-out;
+    transition: background-color .3s ease-out,border-color .3s ease-out,color .3s ease-out;
+    outline: none;
+    border-radius: .5em;
+}
+
+.Button:active{
+    background: #0e90d2;
+}
+
+.Button:disabled{
+    background: #3bb4f2;
+}
+
+
+/**
  * 弹出框基本样式
  */
 .Model{

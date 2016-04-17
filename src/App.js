@@ -9,18 +9,35 @@ var Image = React.createClass({
     },
 });
 
+Store.createStore("Home", {
+    data:[["打开弹框","打开弹框","打开弹框","打开弹框"],["打开弹框","打开弹框","打开弹框","打开弹框"]],
+});
+
 
 var Home = React.createClass({
     render:function(){
+
+        //<Button >打开弹框</Button>
+        //<Button >打开弹框</Button>
+        //<Button >打开弹框</Button>
+
+        var data = this.props.store.get("Home").get("data");
+
         return <div className="Home">
-            <div onClick={function(){
-                console.log("------");
-                this.refs.model.show({game:"123"});
-            }.bind(this)}>Home</div>
+            <Grid data={data} border={false} renderChild={function(child, i){
+                console.log("-------");
+                return <Button key={i}>{child}</Button>
+            }}>
+            </Grid>
+            <Button onClick={this.onShow}>打开弹框</Button>
             <Model ref="model">
                 <Image src="img/ss.jpeg"/>
             </Model>
         </div>
+    },
+
+    onShow:function(){
+        this.refs.model.show({game:"123"});
     },
 });
 

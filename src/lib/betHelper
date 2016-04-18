@@ -1,0 +1,856 @@
+/**
+ * Created by wugz on 2016/2/29.
+ */
+/**
+ * 金币和物品计算器
+ * @type {{}}
+ */
+var GoldCalcer = {
+    create:function(opt){
+        var helper = {},
+            mOpt = $.extend(true, {
+                //单注投注上限
+                oneBet:1000,
+                //是否能使用物品
+                canGood:true,
+                //投注上限对应的索引值
+                canDIndex:0,
+            }, opt),
+            mInfo = null,
+            mRet = {
+                //消耗金币
+                gold:0,
+                //消耗物品
+                good:0,
+                //物品消耗信息
+                goodInfo:[],
+                //最大可投注数
+                maxBet:0,
+                //剩余可投注数
+                canBet:0,
+                //当日剩余可投注数
+                canDBet:0,
+            };
+
+        helper.getOneBet = function(){
+            return mOpt.oneBet;
+        };
+
+        /**
+         * 获取物品消耗
+         */
+        helper.getGoodPost = function(){
+            return mRet.good<=0?"":(mRet.goodInfo[0]+","+mRet.good+";");
+        };
+
+        helper.getGold = function(){
+            return mRet.gold;
+        };
+
+        helper.getMaxBet = function(){
+            return mRet.maxBet;
+        };
+
+        helper.getCanBet = function(){
+            return mRet.canBet;
+        };
+
+        helper.getCanDBet = function(){
+            return mRet.canDBet;
+        };
+
+        /**
+         * 重新计算投注倍数
+         * @param bet
+         * @returns {{gold: number, good: number, goodInfo: Array, maxBet: number, canBet: number, canDBet: number}}
+         */
+        helper.calc = function(bet){
+            //从用户中心同步金币和物品
+            mInfo = $.extend(true, {}, jjUser.info);
+
+            var ret = mRet;
+            //计算金币可投注数
+            ret.maxBet = Math.floor(mInfo.gold/mOpt.oneBet);
+
+            //判断是可以消耗物品
+            if(mOpt.oneBet == 1000 && mOpt.canGood && mInfo.waredata.length > 0){
+                //计算物品的消耗(暂时只支持一种物品消耗)
+                var goods = mInfo.waredata[0];
+                if(goods.c > 0){
+                    //计算物品最大可投注数
+                    ret.maxBet += goods.c;
+                    //计算物品消耗
+                    ret.good = goods.c>bet?bet:goods.c;
+                    bet -= ret.good;
+                    ret.canBet = goods.c = goods.c - ret.good;
+                    ret.goodInfo = [goods.i,goods.n];
+                }
+            }
+
+            //计算用户消耗金币
+            ret.gold = bet*mOpt.oneBet;
+            //存储用户消耗金币
+            mInfo.gold -= ret.gold;
+            //计算当日投注上限
+            ret.canDBet = mInfo.daycoins[mOpt.canDIndex] = mInfo.daycoins[mOpt.canDIndex]-ret.gold-ret.good;
+            //计算还可投注数
+            ret.canBet += mInfo.gold;
+
+            return ret;
+        };
+
+        /**
+         * 同步用户金币和物品信息
+         */
+        helper.sync = function(){
+            //同步
+            mInfo != null?jjUser.setInfo(mInfo):"";
+        };
+        //先计算
+        helper.calc(0);
+
+        return helper;
+    },
+};
+
+/***
+ * 投注助手
+ */
+var MixinBetHelper = Store.createStore("BetStore",{
+    //上传数据
+    mPost:{
+        //订单类型
+        oType:"501",
+        //玩法
+        playType: 1,
+        //单注金币数
+        single:1000,
+        //期次
+        period:1,
+        //倍数
+        multiple:1,
+        //物品消耗
+        useObject : '',
+        //连续期数
+        continuousTimes : 1,
+        //投注信息
+        betPlayTypeIds:[],
+        //是否单关，0:单关，1:串投
+        isBunch:0,
+        //串投类型
+        bunchNums:[],
+        //倍数
+        bunchMultiple:1,
+        //胆
+        mustMatchId:[],
+        //活动ID
+        aId:0,
+        //活动类型
+        aType:0,
+        //选中比赛 {matchId : {betId: multiple}}
+        choice:{},
+    },
+
+    //显示数据
+    mShow:{
+
+    },
+
+    //是否投注中
+    isCommiting:false,
+},{
+    /**
+     * 用于提交
+     */
+    _utils:{
+        //订单类型
+        typeUtils:{},
+
+        //玩法类型
+        playUtils:{},
+
+        /**
+         * 更新mPost中数据，（不会更新界面）
+         * @param type
+         * @param value
+         */
+        updatePost:function(type, value){
+            Store.store("BetStore.mPost."+type, value, false);
+        },
+    },
+
+    /**
+     * 创建一个投注对象
+     * @param type 竞彩类型（0：竞彩，1：数字彩）
+     * @param otype 订单类型
+     * @param play 玩法类型
+     * @param single 单注金币
+     */
+    create:function(type, otype, play, single){
+        var helper = {},
+            //公用方法
+            mUtils = MixinBetHelper._utils,
+            //竞彩玩法
+            mTypeUtil = MixinBetHelper._utils.typeUtils[type],
+            //玩法工具，计算钱
+            mPlayUtil = MixinBetHelper._utils.playUtils[play],
+            //改变订单类型
+            mOrderKey = null,
+            //历史记录
+            history = null;
+
+        /**
+         *
+         */
+        helper.reset = function(){
+            //恢复到初始数据
+            Store.rebackStore("BetStore");
+            //设置订单类型
+            otype && mUtils.updatePost("oType", otype);
+            //设置玩法类型
+            play && mUtils.updatePost("playType", play);
+            //设置单注金币
+            single && mUtils.updatePost("single", single);
+        };
+
+        /**
+         * 保存历史记录
+         */
+        var save = function(){
+            history = Store.store("BetStore");
+        };
+
+        /**
+         * 恢复历史记录
+         */
+        var back = function(){
+            history != null && Store.store("BetStore", history);
+        };
+
+        /**
+         * 改变choice字段key
+         * @param key
+         */
+        helper.key = function(key){
+            if(key != undefined)
+                mOrderKey = key;
+            else
+                return mOrderKey;
+        };
+
+        /**
+         *
+         */
+        helper.toggle = function(id, value){
+            //保存记录
+            save();
+            //
+
+        };
+
+        helper.commit = function(){
+
+        };
+
+        return helper;
+    },
+
+    /**
+     * 创建一个大订单类型（主要包括订单修改）
+     * @param type
+     * @param util
+     */
+    createType:function(type, util){
+
+    },
+
+    /**
+     * 创建一个小玩法类型（包括计算方法）
+     * @param play
+     * @param util
+     */
+    createType:function(play, util){
+
+    },
+});
+
+
+/**
+ * 数字彩投注Mixin
+ */
+var MixinNumberHelper = Store.createStore("NumberStore",{
+    //提交订单的信息
+    mPost:{
+        //订单类型
+        oType:"501",
+        //单注金币数
+        single:1000,
+        //期次
+        period:1,
+        //倍数
+        multiple:1,
+        //物品消耗
+        useObject : '',
+        //玩法
+        playType: 1,
+        //连续期数
+        continuousTimes : 1,
+        //投注信息（数字彩字段）
+        betPlayTypeIds:[],
+        //是否单关，0:单关，1:串投
+        isBunch:0,
+        //串投类型
+        bunchNums:[],
+        //倍数
+        bunchMultiple:1,
+        //胆
+        mustMatchId:[],
+        //活动ID
+        aId:0,
+        //活动类型
+        aType:11,
+        //选中比赛 {matchId : {betId: multiple}}
+        choice:{},
+    },
+    //当前订单的索引值
+    mOrderIndex:0,
+    //订单列表
+    mOrders:[[]],
+    //投注信息
+    mBetInfo:{bet:0,bei:1,gold:0,flag:false},
+    //是否正在提交中
+    isCommiting:false,
+},{
+    create:function(otype, calcMixin, playType){
+
+        var helper = {},
+            playType = $.isDef(playType)?playType:1,
+            //获取post
+            //mPost = Store.store("NumberStore.mPost"]),
+            mGoldCalcer = GoldCalcer.create();
+
+        var updatePost = function(key, value){
+            return Store.store("NumberStore.mPost."+key, value);
+        };
+
+        helper.componentWillMount = function(){
+            this.reset();
+        };
+
+        /**
+         * 重置
+         */
+        helper.reset = function(){
+            //恢复数据
+            Store.rebackStore("NumberStore");
+            updatePost("oType", otype);
+            updatePost("playType", playType);
+        };
+
+        /**
+         * 设置期数
+         * @param period
+         */
+        helper.setPeriod = function(period){
+            updatePost("period", period);
+        };
+
+        /**
+         * 设置倍数
+         * @param bei
+         */
+        helper.setBei = function(bei){
+            updatePost("multiple", multiple);
+            //mPost.multiple = bei;
+            this.updateUI();
+        };
+
+        helper.getOrder = function(){
+            var mOrders = Store.store("NumberStore.mOrders"),
+                mOrderIndex = Store.store("NumberStore.mOrderIndex");
+            if(!mOrders[mOrderIndex])
+                mOrders[mOrderIndex] = [];
+            return mOrders[mOrderIndex];
+        };
+
+        helper.getOrders = function(){
+            return Store.store("NumberStore.mOrders");
+        };
+
+
+        /**
+         * 刷新数据
+         * @param needCalc
+         */
+        helper.updateUI = function(){
+            //var {mPost} = Store.store(["NumberStore"]);
+            var show = {bet:0,max:0,min:0,flag:false,bei:mPost.multiple,gold:0,totalBet:0,stage:mPost.continuousTimes};
+            var calcOrder = this.calcOrder?this.calcOrder:calcMixin.calcOrder?calcMixin.calcOrder:null;
+                //计算结果方法
+            if(calcOrder)
+                show = $.extend(true, show, calcOrder(helper.getOrder()));
+            //计算金币
+            show = $.extend(true, show, mGoldCalcer.calc(show.bet*show.bei*show.stage));
+            Store.store("NumberStore.mBetInfo",show, false);
+            Store.store("NumberStore.mOrders",helper.getOrders());
+        };
+
+         /**
+         * @override
+         * 重写转换订单方法
+         * @param order
+         * @returns {Array}
+         */
+        var tranOrder=function(order){
+            var arr =[];
+            for(var i=0; i<order.length; i++){
+                if(order[i]) arr.push(i);
+            }
+            return arr;
+        };
+
+        /**
+         * 提交订单
+         */
+        helper.commit = function(success){
+            //如果正在投注中
+            if(Store.store(["NumberStore"]).isCommiting == true)
+                return;
+            //修改提交状态值
+            Store.store(["NumberStore"], {isCommiting:true});
+            var {mPost,mOrders}  = Store.store(["NumberStore"]);
+            mPost.useObject = mGoldCalcer.getGoodPost();
+            //判断是否需要在提交订单前，对订单内容进行转换
+            if(calcMixin.tranOrder == true){
+                for(var i=0; i<mOrders.length; i++){
+                    mPost.betPlayTypeIds[i] = tranOrder(mOrders[i]);
+                }
+            }else{
+                mPost.betPlayTypeIds = mOrders;
+            }
+            console.log("-----", JSON.stringify(mPost));
+
+            WSMixin.subdata(WSUrl.NUMBER_BET,function(data){
+                console.log("-------ret ", data);
+                if(data.result === 1){
+                    new Toast({message: data.description}).show();
+                    Store.store(["NumberStore"], {isCommiting: false});
+                }else{
+                    new Toast({message: "投注成功"}).show();
+                    //同步金币
+                    mGoldCalcer.sync();
+                    helper.reset();
+                    //判断是否定义提交成功之后的处理
+                    if($.isFunction(success)) success();
+                }
+            },{caipiaos:JSON.stringify(mPost)}, function() {
+                new Toast({message: "投注失败"}).show();
+                Store.store(["NumberStore"], {isCommiting: false});
+            });
+        }
+
+        /**
+         * 选中选项
+         * @param index
+         * @param value
+         */
+        helper.toggle = function(index,value){
+            var mOrder = helper.getOrder();
+            if(value == undefined){
+                if(mOrder.indexOf(index)>=0){
+                    mOrder.delete(index);
+                }else{
+                    mOrder.push(index);
+                }
+            }else{
+                if(mOrder[index] && mOrder[index] == value)
+                    delete mOrder[index];
+                else{
+                    mOrder[index] = value;
+                }
+            }
+            //判断是否重新了检测方法
+            if(calcMixin.checkSelect) calcMixin.checkSelect(mOrder, index, value);
+            this.updateUI();
+        };
+
+        helper.reset();
+        return helper;
+    }
+});
+
+/**
+ * 足彩投注工具
+ */
+var MixinBallHelper = Store.createStore("BallStore", {
+    mPost:{
+        //是否单关，0:单关，1:串投
+        isBunch:0,
+        //串投类型
+        bunchNums:[],
+        //倍数
+        bunchMultiple:1,
+        //胆
+        mustMatchId:[],
+        //活动ID
+        aId:0,
+        //活动类型
+        aType:11,
+        //单注金额
+        single: 1000,
+        //玩法类型
+        playType:0,
+        //选中比赛 {matchId : {betId: multiple}}
+        choice:{},
+        //使用物品
+        useObject:"",
+    },
+    //投注信息
+    mBetInfo:{bet:0,bei:1,gold:0,flag:false},
+    //是否正在提交中
+    isCommiting:false,
+},{
+    create:function(opt, play, goldCalcer){
+        var helper = {},
+            playUtil = $.isPlainObject(play)?play:SingleUtil.create(),
+            mPost = Store.store("BallStore").mPost,
+            //用户可以自己传递goldCalcer
+            mGoldCalcer = goldCalcer?goldCalcer:GoldCalcer.create(),
+            mGames = {};
+
+        helper.setAid = function(aid){
+            if(!aid) aid= 0;
+            mPost.aId = aid;
+        };
+
+        helper.setPlayType = function(ptype){
+            ptype = ptype==2?3:ptype==3?2:ptype;
+            //足球玩法值
+            mPost.playType = ptype+1;
+        };
+
+        helper.componentWillMount = function(){
+            //恢复Store
+            helper.reset();
+        };
+
+        helper.reset=function(){
+            Store.rebackStore("BallStore");
+            mPost = Store.store("BallStore").mPost;
+            mGames = {};
+        };
+
+        helper.getUitl = function(){
+            return playUtil;
+        };
+
+        /**
+         * 更新界面
+         */
+        var updateUI = function(){
+            var show = {bet:0,max:0,min:0,flag:false,bei:mPost.bunchMultiple,gold:0,totalBet:0,oneBet:mGoldCalcer.getOneBet()};
+            //计算结果方法
+            $.extend(show, playUtil.calc(mPost.choice, mGames));
+            //计算金币
+            $.extend(show, mGoldCalcer.calc(show.bet*show.bei));
+            //更新金币
+            Store.store("BallStore", {mBetInfo:show});
+        };
+
+        /**
+         * 获取选中结果
+         * @param game
+         * @returns {*}
+         */
+        helper.getSelect = function(game){
+            var select = mPost.choice[game.gi()];
+            return select?select:{};
+        };
+
+        /**
+         * 选中
+         * @param game
+         * @param key
+         * @param value
+         */
+        helper.toggle = function(game, key, value){
+            //如果正在投注中
+            if(Store.store(["BallStore"]).isCommiting == true)
+                return;
+            var selects = playUtil.toggle(this.getSelect(game), key, value, mGoldCalcer),
+                id = game.gi();
+            //判断返回结果是否为空
+            if(selects == null){
+                delete mPost.choice[id];
+                delete mGames[id];
+            }
+            else{
+                mPost.choice[id] = selects;
+                mGames[id] = game;
+            }
+            updateUI();
+        };
+
+        /**
+         * 设置倍数
+         */
+        helper.setBei = function(bei){
+            mPost.bunchMultiple = bei;
+            updateUI();
+        };
+
+        helper.commit = function(success){
+            if(Object.keys(mGames).length == 0){
+                new Toast({message:"请至少选择一项进行投注"}).show();
+                return;
+            }
+            //如果正在投注中
+            if(Store.store(["BallStore"]).isCommiting == true)
+                return;
+
+            //修改提交状态值
+            Store.store(["BallStore"], {isCommiting:true});
+            mPost.useObject = mGoldCalcer.getGoodPost();
+
+            console.log("-----", Store.store(["BallStore"]).isCommiting, JSON.stringify(mPost));
+            WSMixin.subdata(WSUrl.BET,function(data){
+                console.log("-------ret ", data);
+                if(data.result === 1){
+                    new Toast({message: data.description}).show();
+                    Store.store(["BallStore"], {isCommiting: false});
+                }else{
+                    new Toast({message: "投注成功"}).show();
+                    //同步投注记录
+                    if(playUtil.syncHistory) playUtil.syncHistory(mPost.choice,mGames);
+                    helper.reset();
+                    //同步金币
+                    mGoldCalcer.sync();
+                    //判断是否定义提交成功之后的处理
+                    if($.isFunction(success)) success();
+                }
+            },{caipiaos:JSON.stringify(mPost)}, function() {
+                console.log("000000");
+                new Toast({message: "投注失败"}).show();
+                Store.store(["BallStore"], {isCommiting: false});
+            });
+        };
+
+        return helper;
+    },
+});
+
+/**
+ * 单关投注助手
+ * @type {{create: Function}}
+ */
+var SingleUtil = {
+    create:function(){
+        var util = {isChuan:false};
+
+        /**
+         * 获取单个选中项
+         * @param choice
+         * @returns {*}
+         */
+        util.getSelects = function(choice,games){
+            for(key in choice){
+                return {selects:choice[key],game:games[key]};
+            }
+        };
+
+        util.syncHistory = function(choice, games){
+            var item = util.getSelects(choice, games);
+            MixinFootHistory.saveHistory(item.game, item.selects);
+        };
+
+        /**
+         * 检测
+         * @param goldCalcer
+         * @param value
+         * @returns {*}
+         */
+        var check = function(goldCalcer, value){
+            var canbet = goldCalcer.getCanBet(),
+                canDBet = goldCalcer.getCanDBet(),
+                oneBet = goldCalcer.getOneBet();
+            if(canbet <=0){
+                new Toast({message:"金币不足"+oneBet}).show();
+                return 0;
+            }else if(canDBet <=0){
+                new Toast({message:"已达当日投注上限"}).show();
+                return 0;
+            }else if(value*oneBet > canbet){
+                return canbet/oneBet;
+            }else if(value*oneBet > canDBet){
+                return canDBet/oneBet;
+            }
+            return value;
+        }
+
+        util.toggle = function(selects, key, value, goldCalcer){
+            //检测是否可以投注
+            if(value >0 && (value=check(goldCalcer, value))<=0)
+                return selects;
+
+            var item = selects[key];
+            if(value == 0){
+                delete selects[key];
+            }else if(item == undefined){
+                selects[key] = value>0?value:0;
+            }else{
+                selects[key] += value;
+                if(selects[key] <= 0)
+                    delete selects[key];
+            }
+            return Object.keys(selects).length ==0?null:selects;
+        };
+
+        /**
+         * 计算单关金币
+         * @param choice
+         * @param games
+         * @returns {{max: number, min: number, bet: number}}
+         */
+        util.calc = function(choice, games){
+            if(Object.keys(choice).length === 0)
+                return {max:0,min:0,bet:0};
+            var item = util.getSelects(choice, games),
+                selects = item.selects,
+                game = item.game,
+                os = game.gos(),
+                ret = {max:0,min:0,bet:0};
+            $.each(selects, function(key, value){
+                ret.bet += value;
+                var gold = value*os[key];
+                ret.max = (gold>ret.max)?gold:ret.max;
+                ret.min = (gold<ret.min||ret.min==0)?gold:ret.min;
+            });
+            return ret;
+        };
+
+        return util;
+    }
+}
+
+var MixinFootHistory = Store.createStore("FootHistory",{
+    //每中玩法对应一个历史记录
+    0:{},
+    51:{},
+},{
+    storeHistory:function(history, aid){
+        aid = aid?aid:0;
+        Store.store(["FootHistory", aid],history);
+    },
+
+    getHistory:function(aid, gameid, type) {
+        var historys = Store.store("FootHistory"),
+            ahistory = historys[aid],
+            history = ahistory && ahistory[gameid]?ahistory[gameid]:[];
+
+        switch (type){
+            case 0:
+                return [history[0],history[4],history[2]];
+            case 1:
+                return [history[1],history[5],history[7]];
+            case 2:
+                if(history[6] >=1 ) return ["已投"];
+                break;
+            case 3:
+                if(history[7] >=1 ) return ["已投"];
+        }
+        return [];
+    },
+
+    saveHistory:function(game, select){
+        var historys = Store.store("FootHistory"),
+            ahistory = historys[game.aid],
+            history = ahistory && ahistory[game.gi()]?ahistory[game.gi()]:[];
+        var indexs = this.getIndexs(game.gType());
+        $.each(select, function(key, value){
+            if(game.gType() < 2){
+                history[indexs[key]] += value;
+            }else{
+                history[indexs] = 1;
+            }
+        });
+        console.log(history);
+    },
+
+    getIndexs:function(type){
+        switch (type) {
+            case 0:
+                return [0, 4, 2];
+            case 1:
+                return [1, 5, 3];
+            case 2:
+                return 6;
+            case 3:
+                return 7;
+        }
+    },
+});
+
+/***
+ *
+ * @type {{create: Function}}
+ */
+var RGame = {
+    create:function(data){
+        //浅拷贝数据
+        var rgame = $.extend({}, data),
+            //玩法
+            mPlay = 0,
+            //类型
+            mType = 0,
+            //选中项
+            mSelect = {};
+
+        //获取历史记录
+        //rgame.history = history && history[rgame.i]?history[rgame.i]:[];
+        //rgame.mSelect
+
+        //rgame.reset = function(play, type){
+        //    mPlay = play;
+        //    mType = type;
+        //    mSelect = {};
+        //};
+
+        /**
+         * 获取投注记录
+         * @returns {*}
+         */
+        rgame.history = function(){
+            //var history = Store.store(["FootHistory", 11, rgame.i]);
+            var history = MixinFootHistory.getHistory(rgame.aid, rgame.gi(), rgame.gType());
+            return history;
+        };
+
+        /**
+         * 获取赔率
+         */
+        //rgame.gos = function(){
+        //    var os = [rgame.o,rgame.ro, rgame.bo, rgame.so];
+        //    return mType == 5?os:os[mType];
+        //};
+
+        rgame.select = function(){
+            return mSelect;
+        }
+
+        rgame.toggle = function(key, value){
+            var item = mSelect[key];
+            if(value == 0){
+                delete mSelect[key];
+            }else if(item == undefined){
+                mSelect[key] = value;
+            }else{
+                mSelect[key] += value;
+                if(mSelect[key] <= 0)
+                    delete mSelect[key];
+            }
+            return Object.keys(mSelect).length != 0;
+        };
+
+        return rgame;
+    }
+};

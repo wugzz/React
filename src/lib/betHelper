@@ -177,6 +177,15 @@ var MixinBetHelper = Store.createStore("BetStore",{
         updatePost:function(type, value){
             Store.store("BetStore.mPost."+type, value, false);
         },
+
+        /**
+         * 
+         * @param type
+         * @param value
+         */
+        updateChoice:function(type, value){
+            Store.store();
+        },
     },
 
     /**
@@ -242,9 +251,14 @@ var MixinBetHelper = Store.createStore("BetStore",{
          *
          */
         helper.toggle = function(id, value){
+            //判断是否传入value
+            if(value == undefined) value = 1;
             //保存记录
             save();
+
+
             //
+            if(mPlayUtil.check) mPlayUtil.check();
 
         };
 
@@ -269,7 +283,7 @@ var MixinBetHelper = Store.createStore("BetStore",{
      * @param play
      * @param util
      */
-    createType:function(play, util){
+    createPlay:function(play, util){
 
     },
 });

@@ -290,6 +290,9 @@
             startX: 0,
             startY: 0,
             scrollY: true,
+            minScrollY:0,
+            topOffset:0,
+            bottomOffset:0,
             directionLockThreshold: 5,
             //是否开启动量动画，关闭可以提升效率。
             momentum: true,
@@ -360,6 +363,7 @@
         this.scrollTo(this.options.startX, this.options.startY);
         //重置状态为可读
         this.enable();
+
     }
 
     IScroll.prototype = {
@@ -525,8 +529,8 @@
             if ( newX > 0 || newX < this.maxScrollX ) {
                 newX = this.options.bounce ? this.x + deltaX / 3 : newX > 0 ? 0 : this.maxScrollX;
             }
-            if ( newY > 0 || newY < this.maxScrollY ) {
-                newY = this.options.bounce ? this.y + deltaY / 3 : newY > 0 ? 0 : this.maxScrollY;
+            if ( newY > this.minScrollY || newY < this.maxScrollY ) {
+                newY = this.options.bounce ? this.y + deltaY / 3 : newY > this.minScrollY ? this.minScrollY : this.maxScrollY;
             }
 
             this.directionX = deltaX > 0 ? -1 : deltaX < 0 ? 1 : 0;
@@ -534,6 +538,8 @@
 
             if ( !this.moved ) {
                 this._execEvent('scrollStart');
+            }else{
+                this._execEvent('scrollMove',newX,newY);
             }
 
             this.moved = true;
@@ -553,6 +559,7 @@
         },
 
         _end: function (e) {
+            console.log("_end");
             if ( !this.enabled || utils.eventType[e.type] !== this.initiated ) {
                 return;
             }
@@ -577,9 +584,12 @@
             this.endTime = utils.getTime();
 
             // reset if we are outside of the boundaries
+            console.log("resetPosition----");
             if ( this.resetPosition(this.options.bounceTime) ) {
                 return;
             }
+
+            console.log("_endddd:");
 
             this.scrollTo(newX, newY);	// ensures that the last position is rounded
 
@@ -633,7 +643,7 @@
 
             if ( newX != this.x || newY != this.y ) {
                 // change easing function when scroller goes out of the boundaries
-                if ( newX > 0 || newX < this.maxScrollX || newY > 0 || newY < this.maxScrollY ) {
+                if ( newX > 0 || newX < this.maxScrollX || newY > this.minScrollY || newY < this.maxScrollY ) {
                     easing = utils.ease.quadratic;
                 }
 
@@ -666,9 +676,9 @@
             } else if ( this.x < this.maxScrollX ) {
                 x = this.maxScrollX;
             }
-
-            if ( !this.hasVerticalScroll || this.y > 0 ) {
-                y = 0;
+            console.log('-----resetPosition---', this.y, this.options, this.minScrollY);
+            if ( !this.hasVerticalScroll || this.y > this.minScrollY ) {
+                y = this.minScrollY;
             } else if ( this.y < this.maxScrollY ) {
                 y = this.maxScrollY;
             }
@@ -702,7 +712,11 @@
             this.scrollerHeight	= this.scroller.offsetHeight;
 
             this.maxScrollX		= this.wrapperWidth - this.scrollerWidth;
-            this.maxScrollY		= this.wrapperHeight - this.scrollerHeight;
+            this.maxScrollY		= this.wrapperHeight - this.scrollerHeight + this.options.bottomOffset;
+
+            this.minScrollY = 0-this.options.topOffset;
+            console.log('----refresh', this.maxScrollY, this.options.bottomOffset,this.options.topOffset, this.minScrollY);
+            console.log("-----");
 
             /* REPLACE END: refresh */
 
@@ -794,7 +808,12 @@
          * 例：myScroll.scrollTo(0, -100, 1000, IScroll.utils.ease.elastic);
          */
         scrollTo: function (x, y, time, easing) {
+            console.log("scrollTo", x,y,time,easing);
             easing = easing || utils.ease.circular;
+
+            if ( !this.hasVerticalScroll || y > this.minScrollY ) {
+                y = this.minScrollY;
+            }
 
             this.isInTransition = this.options.useTransition && time > 0;
             var transitionType = this.options.useTransition && easing.style;
@@ -841,7 +860,7 @@
             pos.top  -= offsetY || 0;
 
             pos.left = pos.left > 0 ? 0 : pos.left < this.maxScrollX ? this.maxScrollX : pos.left;
-            pos.top  = pos.top  > 0 ? 0 : pos.top  < this.maxScrollY ? this.maxScrollY : pos.top;
+            pos.top  = pos.top  > this.minScrollY ? this.minScrollY : pos.top  < this.maxScrollY ? this.maxScrollY : pos.top;
 
             time = time === undefined || time === null || time === 'auto' ? Math.max(Math.abs(this.x-pos.left), Math.abs(this.y-pos.top)) : time;
 

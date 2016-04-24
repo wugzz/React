@@ -715,11 +715,11 @@
             this.maxScrollY		= this.wrapperHeight - this.scrollerHeight + this.options.bottomOffset;
 
             this.minScrollY = 0-this.options.topOffset;
-            console.log('----refresh', this.maxScrollY, this.options.bottomOffset,this.options.topOffset, this.minScrollY);
-            console.log("-----");
+            // console.log('----refresh', this.maxScrollY, this.options.bottomOffset,this.options.topOffset, this.minScrollY);
+            // console.log("-----");
 
             /* REPLACE END: refresh */
-
+            console.log("this.-----", this.options.scrollX, this.maxScrollX);
             this.hasHorizontalScroll	= this.options.scrollX && this.maxScrollX < 0;
             this.hasVerticalScroll		= this.options.scrollY && this.maxScrollY < 0;
 
